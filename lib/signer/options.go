@@ -4,9 +4,9 @@ import "time"
 
 type Option func(*Signer)
 
-func WithScopesKey(key string) Option {
+func WithDataKey(key string) Option {
 	return func(s *Signer) {
-		s.scopesKey = key
+		s.dataKey = key
 	}
 }
 

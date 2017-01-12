@@ -22,17 +22,17 @@ type optionalString struct {
 }
 
 type Signer struct {
-	scopesKey string
-	sub, iss  optionalString
-	exp       time.Duration
-	method    crypto.SigningMethod
+	dataKey  string
+	sub, iss optionalString
+	exp      time.Duration
+	method   crypto.SigningMethod
 }
 
-func New(method crypto.SigningMethod, opts ...Option) Signer {
+func New(method crypto.SigningMethod, opts ...Option) *Signer {
 	signer := &Signer{
-		scopesKey: "scopes",
-		exp:       fiveMinutes,
-		method:    method,
+		dataKey: "data",
+		exp:     fiveMinutes,
+		method:  method,
 	}
 
 	for _, opt := range opts {
@@ -42,10 +42,13 @@ func New(method crypto.SigningMethod, opts ...Option) Signer {
 	return signer
 }
 
-func (s *Signer) Sign(scopes map[string]interface{}) jwt.JWT {
-	claims := jwt.Claims{}
+func (s *Signer) Sign(data map[string]interface{}) jwt.JWT {
+	now := now()
+	claims := jws.Claims{}
+	// set issued at to result of now()
+	claims.SetIssuedAt(now)
 	// set expiration to s.exp from now
-	claims.SetExpiration(now().Add(s.exp))
+	claims.SetExpiration(now.Add(s.exp))
 	// set jti to new token from sequence
 	claims.SetJWTID(jti())
 
@@ -59,8 +62,8 @@ func (s *Signer) Sign(scopes map[string]interface{}) jwt.JWT {
 		claims.SetIssuer(s.iss.value)
 	}
 
-	// set custom scopes issued by caller
-	claims.Set(s.scopesKey, scopes)
+	// set custom data issued by caller
+	claims.Set(s.dataKey, data)
 
 	return jws.NewJWT(claims, s.method)
 }
