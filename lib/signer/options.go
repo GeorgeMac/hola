@@ -6,7 +6,7 @@ type Option func(*Signer)
 
 func WithDataKey(key string) Option {
 	return func(s *Signer) {
-		s.dataKey = key
+		s.claimsKey = key
 	}
 }
 

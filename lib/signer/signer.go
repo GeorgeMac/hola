@@ -22,17 +22,17 @@ type optionalString struct {
 }
 
 type Signer struct {
-	dataKey  string
-	sub, iss optionalString
-	exp      time.Duration
-	method   crypto.SigningMethod
+	claimsKey string
+	sub, iss  optionalString
+	exp       time.Duration
+	method    crypto.SigningMethod
 }
 
 func New(method crypto.SigningMethod, opts ...Option) *Signer {
 	signer := &Signer{
-		dataKey: "data",
-		exp:     fiveMinutes,
-		method:  method,
+		claimsKey: "claims",
+		exp:       fiveMinutes,
+		method:    method,
 	}
 
 	for _, opt := range opts {
@@ -42,7 +42,7 @@ func New(method crypto.SigningMethod, opts ...Option) *Signer {
 	return signer
 }
 
-func (s *Signer) Sign(data map[string]interface{}) jwt.JWT {
+func (s *Signer) Sign(additionalClaims map[string]interface{}) jwt.JWT {
 	now := now()
 	claims := jws.Claims{}
 	// set issued at to result of now()
@@ -62,8 +62,8 @@ func (s *Signer) Sign(data map[string]interface{}) jwt.JWT {
 		claims.SetIssuer(s.iss.value)
 	}
 
-	// set custom data issued by caller
-	claims.Set(s.dataKey, data)
+	// set custom claims issued by caller
+	claims.Set(s.claimsKey, additionalClaims)
 
 	return jws.NewJWT(claims, s.method)
 }
