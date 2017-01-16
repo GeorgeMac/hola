@@ -2,11 +2,9 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"sort"
 
-	"github.com/georgemac/harry/lib/authentication"
+	"github.com/georgemac/hola/lib/authentication"
 	"github.com/pkg/errors"
 
 	"gopkg.in/jose.v1/crypto"
@@ -52,22 +50,4 @@ func (h *HTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// call embedded handler
 	h.Handler.ServeHTTP(w, r)
-}
-
-// subtract keys b from a
-func subtract(a []interface{}, b []string) (res []string, err error) {
-	sort.Strings(b)
-	for _, v := range a {
-		value, ok := v.(string)
-		if !ok {
-			err = fmt.Errorf("unexpected scope type %v", v)
-			return
-		}
-
-		if i := sort.SearchStrings(b, value); i >= len(b) {
-			res = append(res, value)
-		}
-	}
-
-	return
 }

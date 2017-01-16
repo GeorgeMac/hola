@@ -5,7 +5,7 @@ import (
 	"gopkg.in/jose.v1/jwt"
 )
 
-// validate at compile time, that StorageFunc implements Storage.
+// validate at compile time that StorageFunc implements Storage.
 var _ Storage = StorageFunc(nil)
 
 // Identity is a struct which contains a secret used

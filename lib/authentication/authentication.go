@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/georgemac/harry/lib/identity"
+	"github.com/georgemac/hola/lib/identity"
 	"github.com/pkg/errors"
 	"gopkg.in/jose.v1/jws"
 	"gopkg.in/jose.v1/jwt"

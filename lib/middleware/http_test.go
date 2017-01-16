@@ -13,8 +13,8 @@ import (
 	"gopkg.in/jose.v1/crypto"
 	"gopkg.in/jose.v1/jws"
 
-	"github.com/georgemac/harry/lib/authentication"
-	"github.com/georgemac/harry/lib/identity"
+	"github.com/georgemac/hola/lib/authentication"
+	"github.com/georgemac/hola/lib/identity"
 	"github.com/georgemac/legs"
 	"github.com/stretchr/testify/assert"
 )
@@ -43,7 +43,7 @@ func TestHTTP(t *testing.T) {
 			name:    "error when fetching identity from storage",
 			request: tokenRequest("test.audience.com", "some-issuer-key"),
 			code:    http.StatusInternalServerError,
-			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
+			storage: identity.StorageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{}, false, errors.New("something went wrong in storage")
 			}),
@@ -53,7 +53,7 @@ func TestHTTP(t *testing.T) {
 			name:    "No identity for ISS claim",
 			request: tokenRequest("test.audience.com", "some-issuer-key"),
 			code:    http.StatusUnauthorized,
-			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
+			storage: identity.StorageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{}, false, nil
 			}),
@@ -63,7 +63,7 @@ func TestHTTP(t *testing.T) {
 			name:    "signature is invalid",
 			request: tokenRequest("test.audience.com", "some-issuer-key"),
 			code:    http.StatusUnauthorized,
-			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
+			storage: identity.StorageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{
 					Secret: []byte("some invalid secret"),
@@ -76,7 +76,7 @@ func TestHTTP(t *testing.T) {
 			name:    "valid signature with no scopes",
 			request: tokenRequest("test.audience.com", "some-issuer-key"),
 			code:    http.StatusOK,
-			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
+			storage: identity.StorageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{
 					Secret: []byte("this is super secret"),
@@ -89,7 +89,7 @@ func TestHTTP(t *testing.T) {
 			name:    "valid signature with scopes in unexpected format",
 			request: invalidScopeTokenRequest("test.audience.com", "some-issuer-key"),
 			code:    http.StatusBadRequest,
-			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
+			storage: identity.StorageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{
 					Secret: []byte("this is super secret"),
@@ -102,7 +102,7 @@ func TestHTTP(t *testing.T) {
 			name:    "valid signature with unauthorized scopes",
 			request: tokenRequest("test.audience.com", "some-issuer-key", "resource.action"),
 			code:    http.StatusUnauthorized,
-			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
+			storage: identity.StorageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{
 					Secret: []byte("this is super secret"),
@@ -115,7 +115,7 @@ func TestHTTP(t *testing.T) {
 			name:    "valid signature with unexpected scope types",
 			request: tokenRequest("test.audience.com", "some-issuer-key", 5),
 			code:    http.StatusBadRequest,
-			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
+			storage: identity.StorageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{
 					Secret: []byte("this is super secret"),
@@ -129,7 +129,7 @@ func TestHTTP(t *testing.T) {
 			name:    "valid signature with authorized scopes",
 			request: tokenRequest("test.audience.com", "some-issuer-key", "resource.action"),
 			code:    http.StatusOK,
-			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
+			storage: identity.StorageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{
 					Secret: []byte("this is super secret"),
@@ -186,12 +186,6 @@ func (h httpTestCase) Run(t *testing.T) {
 }
 
 // useful mocks and types
-
-type storageFunc func(string) (identity.Identity, bool, error)
-
-func (s storageFunc) FetchIdentity(i string) (identity.Identity, bool, error) {
-	return s(i)
-}
 
 func invalidScopeTokenRequest(aud, iss string) *http.Request {
 	token := jws.NewJWT(jws.Claims{
