@@ -14,11 +14,11 @@ This package defines the Identity "primitive", which encapsulates a key, a secre
 The package also contains an interface which models a mechanism for secret storage and retrieval. The identity.Storage interfaces
 describes what is required to be exposed by a storage layer, in order for it to be useful within a `hola` authentication flow.
 
-`github.com/georgemac/hola/lib/authentication`
+`github.com/georgemac/hola/lib/auth`
 
 > Simple secret retrieval and verification flow
 
-The authentication package exposes an Authenticator type, which wraps an `identity.Storage` and implements
+The auth package exposes an Authenticator type, which wraps an `identity.Storage` and implements
 a simple token retrieval, verification and scope verification flow. It uses the tokens ISS claim as a key for the storage implementation.
 
 `github.com/georgemac/hola/lib/middleware`
