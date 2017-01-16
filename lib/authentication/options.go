@@ -4,12 +4,6 @@ import "time"
 
 type Option func(*Authenticator)
 
-func WithIDKey(idKey string) Option {
-	return func(a *Authenticator) {
-		a.idKey = idKey
-	}
-}
-
 func WithExpirationLeeway(dur time.Duration) Option {
 	return func(a *Authenticator) {
 		a.validator.EXP = dur

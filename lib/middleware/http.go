@@ -6,24 +6,20 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/georgemac/harry/lib/identity"
+	"github.com/georgemac/harry/lib/authentication"
+	"github.com/pkg/errors"
 
+	"gopkg.in/jose.v1/crypto"
 	"gopkg.in/jose.v1/jws"
-)
-
-type ContextKey string
-
-var (
-	ScopesKey ContextKey = "scopes"
 )
 
 type HTTP struct {
 	http.Handler
-	storage identity.Storage
+	auth *authentication.Authenticator
 }
 
-func New(handler http.Handler, storage identity.Storage) *HTTP {
-	return &HTTP{Handler: handler, storage: storage}
+func New(handler http.Handler, auth *authentication.Authenticator) *HTTP {
+	return &HTTP{Handler: handler, auth: auth}
 }
 
 func (h *HTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -34,55 +30,24 @@ func (h *HTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// fetch the JWTs issuer claim
-	iss, ok := token.Claims().Issuer()
-	if !ok {
-		http.Error(w, "ISS claim is missing", http.StatusBadRequest)
-		return
-	}
-
-	// fetch identity for issuer
-	id, ok, err := h.storage.FetchIdentity(iss)
-	// something went wrong while fetching issuers identity
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// cannot locate identity in storage for issuer
-	if !ok {
-		http.Error(w, "ISS claim is invalid", http.StatusUnauthorized)
-		return
-	}
-
-	// validate JWT token
-	if err := id.Validate(token); err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	// if scopes present in claims, add scopes to request context
-	if scopes := token.Claims().Get(string(ScopesKey)); scopes != nil {
-		// only add scopes if they are present within identity
-		if scopesSlice, ok := scopes.([]interface{}); !ok {
-			message := fmt.Sprintf("scopes in unexpected format %v", scopes)
-			http.Error(w, message, http.StatusBadRequest)
-			return
-		} else {
-			unauthScopes, err := subtract(scopesSlice, id.Scopes)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			if len(unauthScopes) > 0 {
-				message := fmt.Sprintf("scopes not supported %v", unauthScopes)
-				http.Error(w, message, http.StatusUnauthorized)
-				return
-			}
-
-			r = r.WithContext(context.WithValue(r.Context(), ScopesKey, scopesSlice))
+	if scopes, err := h.auth.Validate(token); err != nil {
+		code := http.StatusInternalServerError
+		switch errors.Cause(err) {
+		case authentication.ErrISSClaimMissing,
+			authentication.ErrScopesInvalid:
+			// badly formatted requests
+			code = http.StatusBadRequest
+		case authentication.ErrCannotFindIdentity,
+			authentication.ErrScopesUnauthorized,
+			crypto.ErrSignatureInvalid:
+			// unuathorized requests
+			code = http.StatusUnauthorized
 		}
+
+		http.Error(w, err.Error(), code)
+		return
+	} else if len(scopes) > 0 {
+		r = r.WithContext(context.WithValue(r.Context(), authentication.ScopesKey, scopes))
 	}
 
 	// call embedded handler

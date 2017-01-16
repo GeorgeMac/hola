@@ -13,6 +13,7 @@ import (
 	"gopkg.in/jose.v1/crypto"
 	"gopkg.in/jose.v1/jws"
 
+	"github.com/georgemac/harry/lib/authentication"
 	"github.com/georgemac/harry/lib/identity"
 	"github.com/georgemac/legs"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func TestHTTP(t *testing.T) {
 			// request with JWT, but no issuer claim
 			request: tokenRequest("test.audience.com", ""),
 			code:    http.StatusBadRequest,
-			body:    "ISS claim is missing\n",
+			body:    "authentication: ISS missing from JWT claims\n",
 		},
 		httpTestCase{
 			name:    "error when fetching identity from storage",
@@ -46,17 +47,17 @@ func TestHTTP(t *testing.T) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{}, false, errors.New("something went wrong in storage")
 			}),
-			body: "something went wrong in storage\n",
+			body: "authentication: error fetching identity from storage: something went wrong in storage\n",
 		},
 		httpTestCase{
-			name:    "ISS claim is invalid",
+			name:    "No identity for ISS claim",
 			request: tokenRequest("test.audience.com", "some-issuer-key"),
 			code:    http.StatusUnauthorized,
 			storage: storageFunc(func(iss string) (identity.Identity, bool, error) {
 				assert.Equal(t, "some-issuer-key", iss)
 				return identity.Identity{}, false, nil
 			}),
-			body: "ISS claim is invalid\n",
+			body: "authentication: identity cannot be located for ISS claim\n",
 		},
 		httpTestCase{
 			name:    "signature is invalid",
@@ -69,7 +70,7 @@ func TestHTTP(t *testing.T) {
 					Method: crypto.SigningMethodHS256,
 				}, true, nil
 			}),
-			body: "signature is invalid\n",
+			body: "authentication: token is invalid: signature is invalid\n",
 		},
 		httpTestCase{
 			name:    "valid signature with no scopes",
@@ -95,9 +96,8 @@ func TestHTTP(t *testing.T) {
 					Method: crypto.SigningMethodHS256,
 				}, true, nil
 			}),
-			body: "scopes in unexpected format 12345\n",
+			body: "authentication: found 12345: invalid scopes in JWT claims\n",
 		},
-
 		httpTestCase{
 			name:    "valid signature with unauthorized scopes",
 			request: tokenRequest("test.audience.com", "some-issuer-key", "resource.action"),
@@ -109,7 +109,7 @@ func TestHTTP(t *testing.T) {
 					Method: crypto.SigningMethodHS256,
 				}, true, nil
 			}),
-			body: "scopes not supported [resource.action]\n",
+			body: "authentication: found [resource.action]: scopes not authorized for ISS\n",
 		},
 		httpTestCase{
 			name:    "valid signature with unexpected scope types",
@@ -123,7 +123,7 @@ func TestHTTP(t *testing.T) {
 					Scopes: []string{"resource.action", "other.action"},
 				}, true, nil
 			}),
-			body: "unexpected scope type 5\n",
+			body: "authentication: unexpected scope type 5: invalid scopes in JWT claims\n",
 		},
 		httpTestCase{
 			name:    "valid signature with authorized scopes",
@@ -138,7 +138,7 @@ func TestHTTP(t *testing.T) {
 				}, true, nil
 			}),
 			body:   "called\n",
-			scopes: []interface{}{"resource.action"},
+			scopes: []string{"resource.action"},
 		},
 	}.Run(t)
 }
@@ -151,7 +151,7 @@ type httpTestCase struct {
 	// outputs
 	code   int
 	body   string
-	scopes []interface{}
+	scopes []string
 	// state
 	storage identity.Storage
 }
@@ -164,12 +164,11 @@ func (h httpTestCase) Run(t *testing.T) {
 	// record http response from handler
 	recorder := httptest.NewRecorder()
 
+	// wrapped is a http.Handler that records the context
 	wrapped := &contextRecorder{}
+
 	// construct a new handler to test
-	handler := HTTP{
-		Handler: wrapped,
-		storage: h.storage,
-	}
+	handler := New(wrapped, authentication.New(h.storage))
 
 	// run request handler
 	handler.ServeHTTP(recorder, h.request)
@@ -182,7 +181,7 @@ func (h httpTestCase) Run(t *testing.T) {
 
 	if h.scopes != nil {
 		// check scopes as expected
-		assert.Equal(h.scopes, wrapped.ctxt.Value(ScopesKey))
+		assert.Equal(h.scopes, wrapped.ctxt.Value(authentication.ScopesKey))
 	}
 }
 
@@ -196,9 +195,9 @@ func (s storageFunc) FetchIdentity(i string) (identity.Identity, bool, error) {
 
 func invalidScopeTokenRequest(aud, iss string) *http.Request {
 	token := jws.NewJWT(jws.Claims{
-		"aud":             aud,
-		"iss":             iss,
-		string(ScopesKey): 12345,
+		"aud": aud,
+		"iss": iss,
+		string(authentication.ScopesKey): 12345,
 	}, method)
 
 	serialToken, err := token.Serialize([]byte(secret))
@@ -223,7 +222,7 @@ func tokenRequest(aud, iss string, scopes ...interface{}) *http.Request {
 	}
 
 	if len(scopes) > 0 {
-		claims.Set(string(ScopesKey), scopes)
+		claims.Set(string(authentication.ScopesKey), scopes)
 	}
 
 	request := request()
