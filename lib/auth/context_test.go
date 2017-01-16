@@ -11,7 +11,7 @@ import (
 
 func Test_ScopesFromContext_OK(t *testing.T) {
 	scopes := []string{"resource.action:10", "other.action:5"}
-	ctxt := context.WithValue(context.TODO(), ScopesKey.String(), scopes)
+	ctxt := WithScopes(context.TODO(), scopes)
 
 	found, ok, err := ScopesFromContext(ctxt)
 	require.Nil(t, err)
@@ -28,7 +28,7 @@ func Test_ScopesFromContext_NotFound(t *testing.T) {
 
 func Test_ScopesFromContext_Error(t *testing.T) {
 	scopes := "should be an array"
-	ctxt := context.WithValue(context.TODO(), ScopesKey.String(), scopes)
+	ctxt := context.WithValue(context.TODO(), ScopesKey, scopes)
 
 	found, ok, err := ScopesFromContext(ctxt)
 	assert.Equal(t, errors.Cause(err), ErrContextUnexpectedScopesType)

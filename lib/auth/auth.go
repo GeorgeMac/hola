@@ -24,6 +24,9 @@ var (
 	ErrScopesUnauthorized = errors.New("scopes not authorized for ISS")
 )
 
+// Authenticator performs a simple authentication flow for a given jwt token.
+// It decorates a Fetcher implementation to fetch secrets for given keys issued
+// within a JWT token ISS issuer claim.
 type Authenticator struct {
 	storage   identity.Fetcher
 	validator *jwt.Validator
