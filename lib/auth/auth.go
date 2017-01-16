@@ -1,4 +1,4 @@
-package authentication
+package auth
 
 import (
 	"sort"
@@ -10,17 +10,7 @@ import (
 	"gopkg.in/jose.v1/jwt"
 )
 
-type ContextKey string
-
-const (
-	ScopesKey ContextKey = "scopes"
-)
-
 var (
-	// ErrSecretNotFound is returned when a secret key cannot be located in the underlying
-	// storage for a given key ID.
-	ErrSecretNotFound = errors.New("secret not found")
-
 	// ErrISSClaimMissing is returned when the secret ID key is missing from the JWT token claims.
 	ErrISSClaimMissing = errors.New("ISS missing from JWT claims")
 
@@ -35,13 +25,13 @@ var (
 )
 
 type Authenticator struct {
-	storage   identity.Storage
+	storage   identity.Fetcher
 	validator *jwt.Validator
 }
 
-// New create a new(Authenticator) around a Storage implementation
+// New create a new(Authenticator) around an identity fetcher implementation
 // and a variadic set of Options.
-func New(storage identity.Storage, opts ...Option) *Authenticator {
+func New(storage identity.Fetcher, opts ...Option) *Authenticator {
 	a := &Authenticator{
 		storage:   storage,
 		validator: jws.NewValidator(jws.Claims{}, time.Second, time.Second, nil),
@@ -64,7 +54,7 @@ func (a *Authenticator) Validate(token jwt.JWT) (scopes []string, err error) {
 	}
 
 	// fetch identity for issuer
-	id, ok, err := a.storage.FetchIdentity(iss)
+	id, ok, err := a.storage.Fetch(iss)
 	// something went wrong while fetching issuers identity
 	if err != nil {
 		return scopes, errors.Wrap(err, "authentication: error fetching identity from storage")

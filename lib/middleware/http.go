@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/georgemac/hola/lib/authentication"
+	"github.com/georgemac/hola/lib/auth"
 	"github.com/pkg/errors"
 
 	"gopkg.in/jose.v1/crypto"
@@ -13,10 +13,10 @@ import (
 
 type HTTP struct {
 	http.Handler
-	auth *authentication.Authenticator
+	auth *auth.Authenticator
 }
 
-func New(handler http.Handler, auth *authentication.Authenticator) *HTTP {
+func New(handler http.Handler, auth *auth.Authenticator) *HTTP {
 	return &HTTP{Handler: handler, auth: auth}
 }
 
@@ -31,12 +31,12 @@ func (h *HTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if scopes, err := h.auth.Validate(token); err != nil {
 		code := http.StatusInternalServerError
 		switch errors.Cause(err) {
-		case authentication.ErrISSClaimMissing,
-			authentication.ErrScopesInvalid:
+		case auth.ErrISSClaimMissing,
+			auth.ErrScopesInvalid:
 			// badly formatted requests
 			code = http.StatusBadRequest
-		case authentication.ErrCannotFindIdentity,
-			authentication.ErrScopesUnauthorized,
+		case auth.ErrCannotFindIdentity,
+			auth.ErrScopesUnauthorized,
 			crypto.ErrSignatureInvalid:
 			// unuathorized requests
 			code = http.StatusUnauthorized
@@ -45,7 +45,7 @@ func (h *HTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), code)
 		return
 	} else if len(scopes) > 0 {
-		r = r.WithContext(context.WithValue(r.Context(), authentication.ScopesKey, scopes))
+		r = r.WithContext(context.WithValue(r.Context(), auth.ScopesKey, scopes))
 	}
 
 	// call embedded handler
