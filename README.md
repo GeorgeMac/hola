@@ -1,8 +1,9 @@
 hola - JWT authorization toolkit
 ================================
 
-Simple micro-service toolkit which uses JWT to provide OpenID style authentication components.
+[![Go Report Card](https://goreportcard.com/badge/github.com/georgemac/hola)](https://goreportcard.com/report/github.com/georgemac/hola)
 
+Simple micro-service toolkit which uses JWT to provide OpenID style authentication components.
 
 ## Components
 
